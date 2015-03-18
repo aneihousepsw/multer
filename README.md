@@ -56,6 +56,7 @@ The following are the options that can be passed to Multer.
 * `limits`
 * `includeEmptyFields`
 * `inMemory`
+* `inMemoryLimit`
 * `rename(fieldname, filename, req, res)`
 * `changeDest(dest, req, res)`
 * `onFileUploadStart(file, req, res)`
@@ -157,6 +158,10 @@ inMemory: true
 ```
 
 **WARNING**: Uploading very large files, or relatively small files in large numbers very quickly, can cause your application to run out of memory when `inMemory` is set to `true`.
+
+### inMemoryLimit
+
+Size limit for inMemory buffering.  When defined in conjunction with inMemory being set to true, if a single file upload exceeds the defined size (in MB) multer will fall back to writing the file to disk.
 
 ### rename(fieldname, filename, req, res)
 

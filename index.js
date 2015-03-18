@@ -12,6 +12,8 @@ module.exports = function(options) {
   options = options || {};
   options.includeEmptyFields = options.includeEmptyFields || false;
   options.inMemory = options.inMemory || false;
+  var tempMemoryLimit = options.inMemoryLimit || Number.MAX_VALUE;
+  options.inMemoryLimit = (tempMemoryLimit <= Number.MAX_VALUE / 1024 / 1024) ? tempMemoryLimit * 1024 * 1024 : Number.MAX_VALUE;
   options.putSingleFilesInArray = options.putSingleFilesInArray || false;
 
   // if the destination directory does not exist then assign uploads to the operating system's temporary directory
@@ -113,17 +115,34 @@ module.exports = function(options) {
         }
 
         var bufs = [];
-        var ws;
+        var ws = null;
+                
+        function setupWriteStream() {
+          ws = fs.createWriteStream(newFilePath);
+        };        
 
         if (!options.inMemory) {
-          ws = fs.createWriteStream(newFilePath);
+          setupWriteStream();
           fileStream.pipe(ws);
         }
 
         fileStream.on('data', function(data) {
-          if (data) { 
-            if (options.inMemory) bufs.push(data);
-            file.size += data.length; 
+          if (data) {
+            file.size += data.length;
+
+            if (options.inMemory) {
+              bufs.push(data);
+
+              if (file.size > options.inMemoryLimit) {
+                if (ws === null) {
+                  setupWriteStream();
+                }
+                bufs.forEach(function (buffer) {
+                  ws.write(buffer);
+                });
+                bufs = [];
+              }
+            }
           }
           // trigger "file data" event
           if (options.onFileUploadData) { options.onFileUploadData(file, data, req, res); }
@@ -132,12 +151,25 @@ module.exports = function(options) {
         function onFileStreamEnd() {
           file.truncated = fileStream.truncated;
           if (!req.files[fieldname]) { req.files[fieldname] = []; }
-          if (options.inMemory) file.buffer = Buffer.concat(bufs, file.size);
+          if (options.inMemory) {
+            if (file.size <= options.inMemoryLimit) {
+              file.buffer = Buffer.concat(bufs, file.size);
+              finalizeFileStream();
+            } else {
+              ws.end();
+              ws.on('close', finalizeFileStream);
+            }
+          } else {
+            finalizeFileStream();
+          }
+        }
+                
+        function finalizeFileStream() {
           req.files[fieldname].push(file);
-
+                  
           // trigger "file end" event
           if (options.onFileUploadComplete) { options.onFileUploadComplete(file, req, res); }
-
+                  
           // defines has completed processing one more file
           fileCount--;
           onFinish();
