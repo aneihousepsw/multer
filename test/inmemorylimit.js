@@ -6,6 +6,7 @@ var fs = require('fs');
 var rimraf = require('rimraf');
 var mkdirp = require('mkdirp');
 var path = require('path');
+var TestFileSizes = require('./testfilesizes.js');
 
 var dest = './temp';
 
@@ -24,7 +25,7 @@ describe('InMemoryLimit', function () {
     before(function (done) { mkdirp(dest, function (err) { done(); }); });
     
     // delete the temp dir after the tests are run
-    //after(function (done) { rimraf(dest, done); });
+    after(function (done) { rimraf(dest, done); });
     
     var app = express();
     app.use(multer({
@@ -74,7 +75,7 @@ describe('InMemoryLimit', function () {
             
                 // The file is the expected size
                 var fileStats = fs.statSync(form.files.large.path);
-                expect(fileStats['size']).to.equal(2413677);
+                expect(fileStats['size']).to.equal(TestFileSizes.LargeSize);
             
                 done();
             })
